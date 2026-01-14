@@ -31,34 +31,36 @@ func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.JSON(401, responses.ErrorResponse{
-				Error: "Authorization header required",
-				Code:  401,
-			})
+			c.JSON(401, responses.NewError("Authorization header required", 401))
 			c.Abort()
 			return
 		}
 
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 		if tokenString == authHeader {
-			c.JSON(401, responses.ErrorResponse{
-				Error: "Bearer token required",
-				Code:  401,
-			})
+			c.JSON(401, responses.NewError("Bearer token required", 401))
 			c.Abort()
 			return
 		}
 
 		claims := &Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			// Validate the signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
 			return jwtKey, nil
 		})
 
 		if err != nil || !token.Valid {
-			c.JSON(401, responses.ErrorResponse{
-				Error: "Invalid token",
-				Code:  401,
-			})
+			c.JSON(401, responses.NewError("Invalid token", 401))
+			c.Abort()
+			return
+		}
+
+		// Additional validation for claims
+		if claims.UserID == 0 {
+			c.JSON(401, responses.NewError("Invalid token claims", 401))
 			c.Abort()
 			return
 		}
@@ -81,6 +83,22 @@ func GenerateToken(userID uint) (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(jwtKey)
+}
+
+// @Summary User login
+// @Description Authenticate user and get JWT token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param login body LoginRequest true "Login Credentials"
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Router /login [post]
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 // LoginHandler handles user login

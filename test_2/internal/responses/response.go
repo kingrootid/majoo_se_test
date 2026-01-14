@@ -15,6 +15,14 @@ type ErrorResponse struct {
 	Details interface{}  `json:"details,omitempty"` // Additional details if needed
 }
 
+// DetailedErrorResponse provides more detailed error information
+type DetailedErrorResponse struct {
+	Error   string      `json:"error"`
+	Code    int         `json:"code"`
+	Errors  interface{} `json:"errors,omitempty"`
+	Message string      `json:"message,omitempty"`
+}
+
 // ValidationErrorDetail represents a single validation error
 type ValidationErrorDetail struct {
 	Field   string `json:"field"`
@@ -60,5 +68,15 @@ func NewValidationError(errorMsg string, errors []ValidationErrorDetail) Validat
 		Error:  errorMsg,
 		Code:   422, // Unprocessable Entity
 		Errors: errors,
+	}
+}
+
+// NewDetailedError creates a detailed error response
+func NewDetailedError(errorMsg string, code int, details interface{}) DetailedErrorResponse {
+	return DetailedErrorResponse{
+		Error:   errorMsg,
+		Code:    code,
+		Errors:  details,
+		Message: errorMsg,
 	}
 }

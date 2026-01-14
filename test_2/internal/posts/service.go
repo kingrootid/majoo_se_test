@@ -3,6 +3,8 @@ package posts
 import (
 	"rootwritter/majoo_test_2_api/internal/models"
 	"strconv"
+
+	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -11,14 +13,24 @@ type Service interface {
 	GetPostByID(id string) (*models.Post, error)
 	UpdatePost(id string, title, content *string, userID uint) (*models.Post, error)
 	DeletePost(id string, userID uint) error
+
+	// Transaction support
+	WithTransaction(tx *gorm.DB) Service
 }
 
 type service struct {
 	repo Repository
+	db   *gorm.DB // Store the original db instance for transactions
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo}
+func NewService(repo Repository, db *gorm.DB) Service {
+	return &service{repo: repo, db: db}
+}
+
+func (s *service) WithTransaction(tx *gorm.DB) Service {
+	// Get a new repository instance with the transaction
+	txRepo := s.repo.WithTransaction(tx)
+	return &service{repo: txRepo, db: tx}
 }
 
 func (s *service) CreateNewPost(title, content string, userID uint) (*models.Post, error) {

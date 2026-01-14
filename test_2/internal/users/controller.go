@@ -11,6 +11,23 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// @Summary Register a new user
+// @Description Register a new user account
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body RegisterUserRequest true "User Registration Data"
+// @Success 201 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 409 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Router /register [post]
+type RegisterUserRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=50"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6,max=100"`
+}
+
 type Controller struct {
 	svc Service
 }
@@ -19,6 +36,17 @@ func NewController(svc Service) *Controller {
 	return &Controller{svc}
 }
 
+// @Summary Register a new user
+// @Description Register a new user account
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param user body RegisterUserRequest true "User Registration Data"
+// @Success 201 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 409 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Router /register [post]
 func (ctrl *Controller) Register(c *gin.Context) {
 	var input struct {
 		Username string `json:"username" binding:"required,min=3,max=50"`

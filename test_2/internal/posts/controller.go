@@ -1,4 +1,3 @@
-// internal/posts/controller.go
 package posts
 
 import (
@@ -10,6 +9,42 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// @Summary Create a new post
+// @Description Create a new blog post for authenticated user
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param post body CreatePostRequest true "Post Data"
+// @Success 201 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Security BearerAuth
+// @Router /posts [post]
+type CreatePostRequest struct {
+	Title   string `json:"title" binding:"required"`
+	Content string `json:"content" binding:"required"`
+}
+
+// @Summary Update a post by ID
+// @Description Update a specific post by its ID if the user owns it
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param post body UpdatePostRequest true "Update Post Data"
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 404 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Security BearerAuth
+// @Router /posts/{id} [put]
+type UpdatePostRequest struct {
+	Title   *string `json:"title" binding:"omitempty,min=1,max=100"`
+	Content *string `json:"content" binding:"omitempty,min=1,max=10000"`
+}
+
 type Controller struct {
 	svc Service
 }
@@ -18,6 +53,18 @@ func NewController(svc Service) *Controller {
 	return &Controller{svc}
 }
 
+// @Summary Create a new post
+// @Description Create a new blog post for authenticated user
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param post body CreatePostRequest true "Post Data"
+// @Success 201 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Security BearerAuth
+// @Router /posts [post]
 func (ctrl *Controller) Create(c *gin.Context) {
 	var input struct {
 		Title   string `json:"title" binding:"required"`
@@ -27,7 +74,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		// Handle gin validation errors
 		validationErrors := []responses.ValidationErrorDetail{}
-
+		
 		// Check if it's a validator.ValidationErrors type
 		if validationErrs, ok := err.(validator.ValidationErrors); ok {
 			for _, fieldErr := range validationErrs {
@@ -44,7 +91,7 @@ func (ctrl *Controller) Create(c *gin.Context) {
 				Message: err.Error(),
 			})
 		}
-
+		
 		c.JSON(http.StatusUnprocessableEntity, responses.NewValidationError("Validation failed", validationErrors))
 		return
 	}
@@ -79,16 +126,23 @@ func getValidationErrorMessage(fe validator.FieldError) string {
 	}
 }
 
+// @Summary Get all posts
+// @Description Get a list of all posts with pagination
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param page query string false "Page number" default 1
+// @Param limit query string false "Number of items per page" default 10
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Router /posts [get]
 func (ctrl *Controller) GetAll(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	limit := c.DefaultQuery("limit", "10")
 
 	posts, err := ctrl.svc.GetAllPosts(page, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Error: "Failed to fetch posts",
-			Code:  http.StatusInternalServerError,
-		})
+		c.JSON(http.StatusInternalServerError, responses.NewError("Failed to fetch posts", http.StatusInternalServerError))
 		return
 	}
 
@@ -101,21 +155,41 @@ func (ctrl *Controller) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, responses.NewSuccessWithMeta("Posts retrieved successfully", posts, meta))
 }
 
+// @Summary Get a post by ID
+// @Description Get a specific post by its ID
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 404 {object} responses.ErrorResponse
+// @Router /posts/{id} [get]
 func (ctrl *Controller) GetByID(c *gin.Context) {
 	id := c.Param("id")
 
 	post, err := ctrl.svc.GetPostByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, responses.ErrorResponse{
-			Error: "Post not found",
-			Code:  http.StatusNotFound,
-		})
+		c.JSON(http.StatusNotFound, responses.NewError("Post not found", http.StatusNotFound))
 		return
 	}
 
 	c.JSON(http.StatusOK, responses.NewSuccess("Post retrieved successfully", post))
 }
 
+// @Summary Update a post by ID
+// @Description Update a specific post by its ID if the user owns it
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param post body UpdatePostRequest true "Update Post Data"
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 400 {object} responses.ValidationErrorResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 404 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Security BearerAuth
+// @Router /posts/{id} [put]
 func (ctrl *Controller) Update(c *gin.Context) {
 	id := c.Param("id")
 
@@ -127,7 +201,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 	if err := c.ShouldBindJSON(&input); err != nil {
 		// Handle gin validation errors
 		validationErrors := []responses.ValidationErrorDetail{}
-
+		
 		// Check if it's a validator.ValidationErrors type
 		if validationErrs, ok := err.(validator.ValidationErrors); ok {
 			for _, fieldErr := range validationErrs {
@@ -144,7 +218,7 @@ func (ctrl *Controller) Update(c *gin.Context) {
 				Message: err.Error(),
 			})
 		}
-
+		
 		c.JSON(http.StatusUnprocessableEntity, responses.NewValidationError("Validation failed", validationErrors))
 		return
 	}
@@ -165,6 +239,18 @@ func (ctrl *Controller) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, responses.NewSuccess("Post updated successfully", updatedPost))
 }
 
+// @Summary Delete a post by ID
+// @Description Delete a specific post by its ID if the user owns it
+// @Tags posts
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Success 200 {object} responses.SuccessResponse
+// @Failure 401 {object} responses.ErrorResponse
+// @Failure 404 {object} responses.ErrorResponse
+// @Failure 500 {object} responses.ErrorResponse
+// @Security BearerAuth
+// @Router /posts/{id} [delete]
 func (ctrl *Controller) Delete(c *gin.Context) {
 	id := c.Param("id")
 
@@ -174,16 +260,10 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	err := ctrl.svc.DeletePost(id, userID)
 	if err != nil {
 		if err.Error() == "unauthorized" {
-			c.JSON(http.StatusUnauthorized, responses.ErrorResponse{
-				Error: "Not authorized to delete this post",
-				Code:  http.StatusUnauthorized,
-			})
+			c.JSON(http.StatusUnauthorized, responses.NewError("Not authorized to delete this post", http.StatusUnauthorized))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, responses.ErrorResponse{
-			Error: "Failed to delete post",
-			Code:  http.StatusInternalServerError,
-		})
+		c.JSON(http.StatusInternalServerError, responses.NewError("Failed to delete post", http.StatusInternalServerError))
 		return
 	}
 

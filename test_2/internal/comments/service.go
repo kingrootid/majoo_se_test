@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"rootwritter/majoo_test_2_api/internal/models"
+
+	"gorm.io/gorm"
 )
 
 type Service interface {
@@ -14,14 +16,24 @@ type Service interface {
 	GetCommentsByUserID(userID string, page, limit string) ([]*models.Comment, error)
 	UpdateComment(id string, content *string, userID uint) (*models.Comment, error)
 	DeleteComment(id string, userID uint) error
+
+	// Transaction support
+	WithTransaction(tx *gorm.DB) Service
 }
 
 type service struct {
 	repo Repository
+	db   *gorm.DB // Store the original db instance for transactions
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo}
+func NewService(repo Repository, db *gorm.DB) Service {
+	return &service{repo: repo, db: db}
+}
+
+func (s *service) WithTransaction(tx *gorm.DB) Service {
+	// Get a new repository instance with the transaction
+	txRepo := s.repo.WithTransaction(tx)
+	return &service{repo: txRepo, db: tx}
 }
 
 func (s *service) CreateNewComment(content string, postID, userID uint) (*models.Comment, error) {

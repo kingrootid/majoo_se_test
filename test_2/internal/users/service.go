@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // CustomValidator implements custom validation rules
@@ -43,14 +44,26 @@ type Service interface {
 	GetUserByID(id string) (*models.User, error)
 	UpdateUser(id string, username, email *string, userID uint) (*models.User, error)
 	DeleteUser(id string, userID uint) error
+	// Example of a complex transaction operation
+	CreateUserWithProfile(username, email, password string) (*models.User, error)
+
+	// Transaction support
+	WithTransaction(tx *gorm.DB) Service
 }
 
 type service struct {
 	repo Repository
+	db   *gorm.DB // Store the original db instance for transactions
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo}
+func NewService(repo Repository, db *gorm.DB) Service {
+	return &service{repo: repo, db: db}
+}
+
+func (s *service) WithTransaction(tx *gorm.DB) Service {
+	// Get a new repository instance with the transaction
+	txRepo := s.repo.WithTransaction(tx)
+	return &service{repo: txRepo, db: tx}
 }
 
 func (s *service) RegisterUser(username, email, password string) (*models.User, error) {
@@ -135,4 +148,40 @@ func (s *service) DeleteUser(id string, userID uint) error {
 	}
 
 	return s.repo.DeleteUser(uint(userIDToDelete))
+}
+
+// CreateUserWithProfile demonstrates a complex transaction
+func (s *service) CreateUserWithProfile(username, email, password string) (*models.User, error) {
+	var user *models.User
+	var err error
+
+	// Start a transaction
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		// Create user in the transaction context
+		txService := s.WithTransaction(tx)
+
+		// Register the user
+		user, err = txService.RegisterUser(username, email, password)
+		if err != nil {
+			return err // Rolling back the transaction
+		}
+
+		// Here we could perform additional operations in the same transaction
+		// For example, creating a user profile or initializing settings
+		// Example:
+		// profile := &models.UserProfile{UserID: user.ID, Status: "active"}
+		// if err := tx.Create(&profile).Error; err != nil {
+		//     return err
+		// }
+
+		return nil // Commit the transaction
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Don't return the password hash
+	user.Password = ""
+	return user, nil
 }

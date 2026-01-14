@@ -9,14 +9,64 @@ A complete RESTful API for a blog system with user authentication, posts, and co
 - Input validation and error responses
 - Database integration with PostgreSQL
 - Transaction support for database operations
+- Comprehensive error handling
+- Docker deployment support
+- OpenAPI/Swagger documentation
+- Health checking capabilities
+
+## Architecture
+
+The application follows a clean architecture pattern with separation of concerns:
+
+```
+cmd/api/main.go                    # Entry point with routing configuration
+├── internal/
+│   ├── database/                 # Database connection and initialization
+│   ├── middleware/              # Authentication middleware (JWT)
+│   ├── models/                  # Data models (GORM structs)
+│   ├── responses/               # Standardized response formats
+│   ├── routes/                  # Route definitions
+│   ├── users/                   # User management (Controller, Service, Repository)
+│   ├── posts/                   # Post management (Controller, Service, Repository)
+│   └── comments/                # Comment management (Controller, Service, Repository)
+```
+
+### Layered Architecture
+
+- **Controller Layer**: HTTP request/response handling
+- **Service Layer**: Business logic processing
+- **Repository Layer**: Database operations
+- **Models**: Data structures and relations
+- **Middleware**: Cross-cutting concerns (auth, logging, etc.)
 
 ## Prerequisites
 
 - Go 1.19+
 - PostgreSQL database
 - Environment variables configured
+- Docker and Docker Compose (for containerized deployment)
 
-## Environment Variables
+## Setup
+
+### Local Development Setup
+
+1. Clone the repository
+2. Install dependencies: `go mod tidy`
+3. Configure environment variables (see below)
+4. Run the seeding script: `go run cmd/seed/main.go`
+5. Start the server: `go run cmd/api/main.go`
+
+### Using Docker
+
+1. Build and run with docker-compose:
+   ```bash
+   docker-compose up --build
+   ```
+
+2. The API will be available at `http://localhost:8090`
+3. The database will be available at `localhost:5432`
+
+### Environment Variables
 
 Create a `.env` file in the root directory:
 
@@ -29,13 +79,7 @@ DB_NAME=majoo_test
 JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
 ```
 
-## Setup
-
-1. Clone the repository
-2. Install dependencies: `go mod tidy`
-3. Configure environment variables
-4. Run the seeding script: `go run cmd/seed/main.go`
-5. Start the server: `go run cmd/api/main.go`
+For Docker deployment, these are automatically loaded from the docker-compose.yml file.
 
 ## Development with Live Reload (using Air)
 
@@ -65,6 +109,14 @@ For faster development workflow, you can use Air for hot reloading:
    ```
 
 Air will automatically rebuild and restart the server when you make changes to the code. The configuration is already set up in `.air.toml`.
+
+## API Documentation
+
+The API includes OpenAPI/Swagger documentation available at:
+- JSON format: `http://localhost:8090/swagger/doc.json`
+- Interactive UI: `http://localhost:8090/swagger/index.html`
+
+Documentation is generated using [Swag](https://github.com/swaggo/swag) and available in the `docs/` directory.
 
 ## API Endpoints
 
@@ -173,21 +225,42 @@ Error responses follow this format:
 }
 ```
 
+Validation error responses follow this format:
+```json
+{
+  "error": "Validation failed",
+  "code": 422,
+  "errors": [
+    {
+      "field": "username",
+      "message": "This field is required",
+      "value": ""
+    }
+  ]
+}
+```
+
 ## Database Schema
 
-The application uses three main tables:
-
-- `users`: Stores user information (ID, username, email, password hash)
-- `posts`: Stores blog posts (ID, title, content, user_id)
-- `comments`: Stores comments (ID, content, post_id, user_id)
+Detailed database schema documentation is available in [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 
 ## Security Features
 
-- JWT-based authentication
-- Password hashing using bcrypt
-- Input validation and sanitization
+- JWT-based authentication with configurable expiration
+- Password hashing using bcrypt with salt
+- Input validation and sanitization using Go validators
 - Authorization checks for protected resources
-- SQL injection prevention through ORM
+- SQL injection prevention through GORM ORM
+- Token signature validation with HMAC signing method
+- Secure token storage (tokens are not stored server-side)
+
+## Transaction Support
+
+The application implements transaction support for complex operations:
+- Repository layer supports transaction contexts
+- Service layer supports WithTransaction functionality
+- Database operations can be wrapped in ACID transactions
+- Example: Creating a user with additional profile data in a single transaction
 
 ## Testing the API
 
@@ -197,5 +270,76 @@ After starting the server, you can test the API using tools like:
 - Postman
 - Insomnia
 - A browser-based REST client
+- Automated tests
 
 The server runs on `http://localhost:8090` by default.
+
+## Docker Deployment
+
+The application can be deployed using Docker:
+
+### Building the image
+```bash
+docker build -t blog-api .
+```
+
+### Running with Docker Compose (recommended)
+```bash
+docker-compose up --build
+```
+
+### Running the container
+```bash
+docker run -p 8090:8090 \
+  -e DB_HOST=your-db-host \
+  -e DB_PORT=5432 \
+  -e DB_USER=your-db-user \
+  -e DB_PASSWORD=your-db-password \
+  -e DB_NAME=your-db-name \
+  -e JWT_SECRET_KEY=your-secret-key \
+  blog-api
+```
+
+## Known Limitations
+
+- **Performance**: For very high-load scenarios, consider caching with Redis
+- **File Uploads**: The current API doesn't support file uploads (images, documents)
+- **Real-time Features**: No WebSocket support for real-time notifications or chat
+- **Advanced Queries**: Limited search and filtering capabilities
+- **Rate Limiting**: No built-in rate limiting (should be implemented at proxy level)
+- **Analytics**: No built-in analytics or monitoring
+- **Soft Deletes**: Only users and posts support soft deletes; comments are hard deleted
+
+## Future Improvements
+
+- Add Redis caching for better performance
+- Implement rate limiting middleware
+- Add comprehensive logging with log levels
+- Add unit and integration tests
+- Implement file upload functionality
+- Add email notifications for comments
+- Implement advanced search and filtering
+- Add real-time features with WebSockets
+- Add metrics and monitoring (Prometheus integration)
+
+## Docker Files
+
+- `Dockerfile`: Production-ready container image
+- `docker-compose.yml`: Multi-service orchestration (API + Database)
+- `generate_swagger.sh`: Script to generate API documentation
+
+## Git Best Practices
+
+- Follow semantic commit messages
+- Use feature branches for new functionality
+- Ensure all tests pass before merging
+- Update documentation when adding new features
+- Keep PRs small and focused
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make changes and commit (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
