@@ -17,8 +17,8 @@ COPY . .
 RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init -g cmd/api/main.go --output docs
 
-# Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main cmd/api/main.go
+# Build the Go app with minimal memory usage
+RUN CGO_ENABLED=0 GOOS=linux GOGC=50 go build -o main ./cmd/api
 
 # Start a new stage from scratch
 FROM alpine:latest
